@@ -1,36 +1,26 @@
 name: CI/CD Pipeline - Product Application
 
 # ==============================================================================
-# TALLER EVALUATIVO: AUTOMATIZACION CI/CD (INGENIERIA DE SOFTWARE V - ICESI)
-# ==============================================================================
-# Instrucciones:
-# Complete este archivo configurando los eventos y los 4 jobs descritos en la guia
-# y en la presentacion de clase:
-#
-#   Job 1: test-backend  (Pruebas unitarias Spring Boot + Subir Artefacto JAR)
-#   Job 2: test-frontend (Linting TypeScript + Compilacion Vite de la SPA)
-#   Job 3: build-docker  (Construccion Multi-Stage con Docker Buildx de API y Web)
-#   Job 4: smoke-test    (Levantamiento con Docker Compose + Prueba cURL al API)
+# TALLER EVALUATIVO: AUTOMATIZACION CI/CD
+# INGENIERIA DE SOFTWARE V - ICESI
 # ==============================================================================
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
+
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  # ----------------------------------------------------------------------------
+
+  # ============================================================================
   # JOB 1: VALIDACION Y PRUEBAS UNITARIAS BACKEND
-  # ----------------------------------------------------------------------------
-  # TODO: Configurar runner ubuntu-latest
-  # TODO: actions/checkout@v4
-  # TODO: actions/setup-java@v4 (Java 17, distribution: 'temurin', cache: 'maven')
-  # TODO: Ejecutar mvn clean package en backend/
-  # TODO: actions/upload-artifact@v4 (Subir backend/target/*.jar como 'backend-jar')
+  # ============================================================================
   test-backend:
     name: Backend Unit Tests & Package
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -38,71 +28,73 @@ jobs:
       - name: Configurar JDK 17 (Temurin)
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'maven'  
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
 
-      - name: Ejecutar tests con maven 
+      - name: Ejecutar pruebas unitarias
+        working-directory: ./backend
         run: mvn clean test
 
+      - name: Empaquetar aplicacion
+        working-directory: ./backend
+        run: mvn package -DskipTests
 
       - name: Subir artefacto JAR
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: backend-jar
           path: backend/target/*.jar
-          retention-days: 5      
+          retention-days: 5
 
-  # ----------------------------------------------------------------------------
+
+  # ============================================================================
   # JOB 2: VALIDACION Y COMPILACION FRONTEND
-  # ----------------------------------------------------------------------------
-  # TODO: Configurar runner ubuntu-latest
-  # TODO: actions/checkout@v4
-  # TODO: actions/setup-node@v4 (Node 20, cache: 'npm')
-  # TODO: Ejecutar npm install, npm run lint y npm run build en frontend/
+  # ============================================================================
   test-frontend:
     name: Frontend Lint & Build
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configurar Node 20
+      - name: Configurar Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Instalar dependencias
+        working-directory: ./frontend
         run: npm install
 
-      - name: Verificación estática (lint)
+      - name: Verificacion estatica
+        working-directory: ./frontend
         run: npm run lint
 
-      - name: Build de producción
+      - name: Build de produccion
+        working-directory: ./frontend
         run: npm run build
 
-      - name: Subir artefacto de build
-        if: success()
+      - name: Subir artefacto frontend
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
           path: frontend/dist
-          retention-days: 5  
+          retention-days: 5
 
-  # ----------------------------------------------------------------------------
-  # JOB 3: CONSTRUCCION DE IMAGENES DOCKER (MULTI-STAGE)
-  # ----------------------------------------------------------------------------
-  # TODO: Declarar dependencias: needs: [test-backend, test-frontend]
-  # TODO: docker/setup-buildx-action@v3
-  # TODO: docker/build-push-action@v5 para backend (context: ./backend)
-  # TODO: docker/build-push-action@v5 para frontend (context: ./frontend)
+
+  # ============================================================================
+  # JOB 3: CONSTRUCCION DE IMAGENES DOCKER
+  # ============================================================================
   build-docker:
     name: Build Multi-Stage Docker Images
-    # needs: [ ... ]
+    needs: [test-backend, test-frontend]
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -110,7 +102,7 @@ jobs:
       - name: Configurar Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build imagen backend
+      - name: Construir imagen Backend
         uses: docker/build-push-action@v5
         with:
           context: ./backend
@@ -121,7 +113,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build imagen frontend
+      - name: Construir imagen Frontend
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
@@ -132,12 +124,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Guardar imágenes como artefacto
+      - name: Guardar imagenes Docker
         run: |
           docker save product-api:${{ github.sha }} -o backend-image.tar
           docker save product-frontend:${{ github.sha }} -o frontend-image.tar
 
-      - name: Subir imágenes como artefacto
+      - name: Subir imagenes como artefacto
         uses: actions/upload-artifact@v4
         with:
           name: docker-images
@@ -146,32 +138,30 @@ jobs:
             frontend-image.tar
           retention-days: 1
 
-  # ----------------------------------------------------------------------------
-  # JOB 4: DESPLIEGUE LOCAL Y PRUEBA DE HUMO (SMOKE TEST)
-  # ----------------------------------------------------------------------------
-  # TODO: Declarar dependencias: needs: [build-docker]
-  # TODO: Levantar stack con docker compose up -d --build
-  # TODO: Esperar disponibilidad y validar con curl http://localhost:8080/api/products (HTTP 200)
-  # TODO: Apagar contenedores con docker compose down
+
+  # ============================================================================
+  # JOB 4: SMOKE TEST CON DOCKER COMPOSE
+  # ============================================================================
   smoke-test:
     name: Compose Up & Smoke Testing
-    # needs: [ ... ]
+    needs: [build-docker]
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Descargar imágenes Docker
+      - name: Descargar imagenes Docker
         uses: actions/download-artifact@v4
         with:
           name: docker-images
 
-      - name: Cargar imágenes en el daemon
+      - name: Cargar imagenes en Docker
         run: |
           docker load -i backend-image.tar
           docker load -i frontend-image.tar
 
-      - name: Re-etiquetar imágenes para docker-compose
+      - name: Re-etiquetar imagenes para Docker Compose
         run: |
           docker tag product-api:${{ github.sha }} product-api:latest
           docker tag product-frontend:${{ github.sha }} product-frontend:latest
@@ -179,47 +169,64 @@ jobs:
       - name: Levantar stack con Docker Compose
         run: docker compose up -d
 
-      - name: Esperar a que el backend esté healthy
+      - name: Esperar disponibilidad del backend
         run: |
-          echo "Esperando healthcheck del backend..."
-          timeout 60s bash -c '
-            until [ "$(docker inspect -f "{{.State.Health.Status}}" product-api)" == "healthy" ]; do
-              echo "Backend aún no healthy, reintentando..."
-              sleep 3
-            done
-          '
-          echo "Backend healthy ✅"
+          echo "Esperando a que el backend este disponible..."
 
-      - name: Validar backend con curl
+          for i in {1..20}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/products || true)
+
+            if [ "$STATUS" = "200" ]; then
+              echo "Backend disponible"
+              exit 0
+            fi
+
+            echo "Intento $i: backend aun no disponible..."
+            sleep 3
+          done
+
+          echo "Backend no estuvo disponible a tiempo"
+          exit 1
+
+      - name: Smoke test Backend
         run: |
           echo "Probando GET /api/products..."
-          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/products)
-          if [ "$response" -ne 200 ]; then
-            echo "❌ Backend respondió con código $response"
+
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            http://localhost:8080/api/products)
+
+          if [ "$response" != "200" ]; then
+            echo "Backend respondio con codigo HTTP $response"
             exit 1
           fi
-          echo "✅ Backend respondió 200 OK"
 
-      - name: Validar frontend con curl
+          echo "Backend respondio 200 OK"
+
+      - name: Smoke test Frontend
         run: |
-          echo "Probando GET / del frontend..."
-          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/)
-          if [ "$response" -ne 200 ]; then
-            echo "❌ Frontend respondió con código $response"
+          echo "Probando frontend..."
+
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            http://localhost:3000/)
+
+          if [ "$response" != "200" ]; then
+            echo "Frontend respondio con codigo HTTP $response"
             exit 1
           fi
-          echo "✅ Frontend respondió 200 OK"
 
-      - name: Mostrar estado de contenedores (debug)
+          echo "Frontend respondio 200 OK"
+
+      - name: Mostrar estado de contenedores
         if: always()
         run: docker compose ps
 
-      - name: Mostrar logs si algo falló
+      - name: Mostrar logs si algo falla
         if: failure()
         run: |
-          echo "=== Logs backend ==="
+          echo "========== LOGS BACKEND =========="
           docker compose logs backend
-          echo "=== Logs frontend ==="
+
+          echo "========== LOGS FRONTEND =========="
           docker compose logs frontend
 
       - name: Apagar stack
