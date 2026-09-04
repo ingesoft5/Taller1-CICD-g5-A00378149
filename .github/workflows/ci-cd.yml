@@ -10,10 +10,12 @@ name: CI/CD Pipeline - Product Application
 
 on:
 push:
-branches: [main]
+branches:
+- main
 
 pull_request:
-branches: [main]
+branches:
+- main
 
 jobs:
 
@@ -106,7 +108,9 @@ steps:
 
 build-docker:
 name: Build Multi-Stage Docker Images
-needs: [test-backend, test-frontend]
+needs:
+- test-backend
+- test-frontend
 runs-on: ubuntu-latest
 
 ```
@@ -162,7 +166,8 @@ steps:
 
 smoke-test:
 name: Compose Up & Smoke Testing
-needs: [build-docker]
+needs:
+- build-docker
 runs-on: ubuntu-latest
 
 ```
@@ -281,7 +286,7 @@ steps:
       echo "Frontend respondio 200 OK"
 
   # ------------------------------------------------------------------------
-  # MOSTRAR ESTADO
+  # MOSTRAR ESTADO DE CONTENEDORES
   # ------------------------------------------------------------------------
   - name: Mostrar estado de contenedores
     if: always()
