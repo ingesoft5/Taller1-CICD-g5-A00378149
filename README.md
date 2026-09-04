@@ -1,6 +1,6 @@
 # Taller Evaluativo: Automatización CI/CD y Despliegue Contenerizado Multi-Tier
 **Ingeniería de Software V (Período 2026-2) · Universidad ICESI**
-
+Test-push-ignor
 ---
 
 ## Objetivo de la Práctica (Duración: 2 Horas)
