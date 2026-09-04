@@ -1,11 +1,30 @@
-version: '3.8'
+version: "3.9"
 
 services:
   backend:
-    ## Configurar la imagen
+    build: ./backend
+    container_name: product-api
+    ports:
+      - "8080:8080"
+    networks:
+      - product-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/products"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   frontend:
-    ## Configurar la imagen
+    build: ./frontend
+    container_name: product-frontend
+    ports:
+      - "3000:3000"
+    networks:
+      - product-network
+    depends_on:
+      backend:
+        condition: service_healthy
 
 networks:
   product-network:
