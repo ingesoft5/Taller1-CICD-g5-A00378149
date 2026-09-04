@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  backend:
+    ## Configurar la imagen
+
+  frontend:
+    ## Configurar la imagen
+
+networks:
+  product-network:
+    driver: bridge
